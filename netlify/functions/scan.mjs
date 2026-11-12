@@ -48,13 +48,13 @@ async function resolvePublic(url) {
   if (!addresses.length || !addresses.every(publicIPv4)) throw Error('No se pudo resolver una dirección pública IPv4.');
   return addresses[0];
 }
-function requestHtml(url,address,signal) {
+function requestHtml(url,address,signal, script = false) {
   return new Promise((resolve,reject) => {
     const transport = url.protocol === 'https:' ? https : http;
     const request = transport.get(url,{
       signal, agent:false, family:4,
       lookup:(_host, options, done) => options.all ? done(null,[{address,family:4}]) : done(null,address,4),
-      headers:{'User-Agent':'WEARE-Medicion/1.0','Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'}
+      headers:{'User-Agent':'WEARE-Medicion/1.0','Accept':script ? 'application/javascript,text/javascript' : 'text/html,application/xhtml+xml','Accept-Encoding':'identity'}
     },response => {
       const code = response.statusCode;
       if (redirectCodes.has(code) && response.headers.location) {
@@ -62,8 +62,9 @@ function requestHtml(url,address,signal) {
         response.destroy();
         return;
       }
-      if (code < 200 || code >= 300 || !/^(?:text\/html|application\/xhtml\+xml)\b/i.test(response.headers['content-type'] ?? '')) {
-        resolve({result:'HTML no disponible (HTTP '+code+')'});
+      const contentType = script ? /^(?:application|text)\/(?:x-)?javascript\b/i : /^(?:text\/html|application\/xhtml\+xml)\b/i;
+      if (code < 200 || code >= 300 || !contentType.test(response.headers['content-type'] ?? '')) {
+        resolve({result:(script ? 'Contenedor' : 'HTML')+' no disponible (HTTP '+code+')'});
         response.destroy();
         return;
       }
@@ -128,6 +129,31 @@ export function summarize(pages) {
       Array.from(p.html.matchAll(identifier),m => m[1] ?? m[0])))].slice(0,12)};
   });
 }
+export function clarityFromContainer(source) {
+  const script = source.replace(/\\(?:u00([0-9a-f]{2})|x([0-9a-f]{2}))/gi,
+    (match,a,b) => {
+      const char = String.fromCharCode(parseInt(a ?? b,16));
+      return /[a-z0-9./:_ -]/i.test(char) ? char : match;
+    }).replace(/\\\//g,'/');
+  const marker = /(?:^|[^a-z0-9.-])(?:[\w-]+\.)*clarity\.ms\/(?:tag\/|collect\b)|Microsoft Clarity\s*-\s*Official/i;
+  const ids = [...new Set(Array.from(script.matchAll(/(?:^|[^a-z0-9.-])(?:[\w-]+\.)*clarity\.ms\/tag\/([a-z0-9]+)(?=[?"'\\\s<]|$)/gi),m=>m[1]))].slice(0,12);
+  return {hint:marker.test(script),ids};
+}
+async function inspectClarityGtm(ids,globalSignal) {
+  return Promise.all(ids.filter(id => /^GTM-[A-Z0-9]{4,16}$/i.test(id)).slice(0,2).map(async id => {
+    const url = new URL('https://www.googletagmanager.com/gtm.js');
+    url.searchParams.set('id',id.toUpperCase());
+    const signal = AbortSignal.any([globalSignal,AbortSignal.timeout(2200)]);
+    try {
+      const response = await requestHtml(url,await resolvePublic(url),signal,true);
+      if (response.html !== undefined) {
+        const details = clarityFromContainer(response.html);
+        return {id,checked:true,partial:response.result.includes('parcialmente'),...details};
+      }
+    } catch { /* An unavailable public container does not invalidate the site scan. */ }
+    return {id,checked:false,hint:false,ids:[]};
+  }));
+}
 export default async function scan(request) {
   const respond = (data,status=200) => Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
   if (request.method !== 'POST') return respond({error:'Método no admitido.'},405);
@@ -144,10 +170,18 @@ export default async function scan(request) {
     if (first.html === undefined) return respond({error:first.result},422);
     const routes = selectRoutes(first.html,new URL(first.url));
     const pages = [first,...await Promise.all(routes.map(route => fetchPage(route,host,signal)))];
+    const signals = summarize(pages);
+    const gtm = signals.find(entry => entry.name === 'GTM');
+    const clarity = signals.find(entry => entry.name === 'Clarity');
+    const clarityGtm = await inspectClarityGtm(gtm.ids,signal);
+    const matches = clarityGtm.filter(container => container.hint);
+    clarity.containers = matches.map(container => container.id);
+    clarity.ids = [...new Set([...clarity.ids,...matches.flatMap(container => container.ids)])].slice(0,12);
     return respond({
       finalUrl:first.url,
       pages:pages.map(({url,result,html}) => ({url,result,ok:html !== undefined})),
-      signals:summarize(pages)
+      signals,
+      clarityGtm
     });
   } catch {
     return respond({error:'Ingresar una URL pública válida para el escaneo.'},400);

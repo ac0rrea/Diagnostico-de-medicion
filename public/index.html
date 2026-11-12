@@ -16,25 +16,41 @@
 <main>
 <section id="audit">
 <div class="hero"><div><p class="eyebrow">MEDICIÓN DIGITAL</p><h1>Diagnóstico de medición</h1><p>Revisar señales del sitio, completar los controles y preparar un informe para Paid Media y Proyectos.</p></div><button id="demo" class="secondary" type="button">Cargar ejemplo <span aria-hidden="true">↗</span></button></div>
+<details class="panel guide"><summary>Cómo hacer un diagnóstico</summary>
+<ol>
+<li><strong>Identificar la cuenta.</strong> Completar sitio, marca y nombre de quien revisa. La fecha queda registrada al guardar o generar el informe.</li>
+<li><strong>Escanear y revisar.</strong> Usar los indicios del escaneo como punto de partida. Cada control explica qué mirar y muestra un ejemplo de qué anotar.</li>
+<li><strong>Compartir el resultado.</strong> Elegir un estado para lo revisado. Una nota breve puede incluir lo observado, el motivo pendiente o un enlace a una captura. Guardar o descargar el informe para compartirlo con Proyectos.</li>
+</ol>
+</details>
 <div class="steps" aria-label="Etapas"><a href="#sitio"><b>01</b> Sitio y escaneo</a><a href="#checklist"><b>02</b> Checklist</a><a href="#informe"><b>03</b> Informe</a></div>
 <form id="audit-form">
 <section class="panel" id="sitio"><div class="section-head"><div><p class="eyebrow">PASO 01</p><h2>Sitio y escaneo</h2></div></div>
 <div class="fields primary-fields">
-<label>URL del sitio<input name="url" id="url" placeholder="https://www.marca.com" inputmode="url" maxlength="280"></label>
-<label>Marca o cuenta<input name="brand" placeholder="Nombre de la cuenta" maxlength="100"></label>
-<label>Plataforma<select name="platform"><option value="">Seleccionar</option><option>Tiendanube</option><option>Shopify</option><option>VTEX</option><option>Magento / Adobe Commerce</option><option>Headless</option><option>Otra / por confirmar</option></select></label>
+<label>URL del sitio<input name="url" id="url" placeholder="https://www.marca.com" inputmode="url" maxlength="280" required></label>
+<label>Marca o cuenta<input name="brand" placeholder="Nombre de la cuenta" maxlength="100" required></label>
+<label>Nombre de quien revisa<input name="meta-owner" placeholder="Nombre y apellido" maxlength="100" required></label>
+<label class="platform">Plataforma (opcional)<select name="platform"><option value="">Por confirmar</option><option>Tiendanube</option><option>Shopify</option><option>VTEX</option><option>Magento / Adobe Commerce</option><option>Headless</option><option>Otra / por confirmar</option></select></label>
 </div>
 <div class="actions"><button id="scan" type="button" class="accent">Escanear URL <span aria-hidden="true">→</span></button><p class="hint" id="scan-status" role="status">Busca indicios en el HTML público de hasta 3 páginas.</p></div>
-<details><summary>Datos de la auditoría</summary><div class="fields extra" id="extra"></div></details>
 <div id="scan-result" hidden></div>
 </section>
 <section class="panel" id="checklist">
-<div class="section-head"><div><p class="eyebrow">PASO 02</p><h2>Checklist de verificación</h2><p>Registrar el resultado por control. Los indicios del escaneo son evidencia preliminar.</p></div><span id="progress" class="progress"></span></div>
+<div class="section-head"><div><p class="eyebrow">PASO 02</p><h2>Checklist de verificación</h2><p>Elegir un estado por control. Se puede agregar una nota breve o un enlace a la evidencia.</p></div><span id="progress" class="progress"></span></div>
+<details class="state-guide"><summary>Qué significa cada estado</summary>
+<ul class="list">
+<li><strong class="good">Correcto</strong> · La prueba confirmó lo esperado.</li>
+<li><strong class="partial">Parcial</strong> · Hay evidencia de funcionamiento y falta comprobar una parte.</li>
+<li><strong class="error">Con errores</strong> · La prueba confirmó un problema.</li>
+<li><strong class="absent">No detectado</strong> · La prueba adecuada se completó y no mostró la señal buscada.</li>
+<li><strong class="unknown">No verificable</strong> · Faltó acceso, una prueba de compra u otra condición. Si Clarity no aparece en el HTML, usar este estado hasta verificarlo al navegar.</li>
+<li><strong>No aplica</strong> · El control queda fuera del alcance de la cuenta. <strong>Pendiente</strong> · Todavía no se revisó.</li>
+</ul></details>
 <div id="checks"></div>
 </section>
 <section class="panel" id="informe">
 <div class="section-head"><div><p class="eyebrow">PASO 03</p><h2>Informe y derivación</h2><p>El informe reúne los resultados, pendientes y próximos pasos.</p></div></div>
-<div class="fields extra" id="follow"></div>
+<details><summary>Agregar seguimiento para Proyectos (opcional)</summary><div class="fields extra" id="follow"></div></details>
 <div class="actions"><button type="button" id="report" class="accent">Ver informe</button><button type="button" id="save" class="secondary">Guardar en historial</button><button type="button" id="new" class="quiet">Nueva auditoría</button></div>
 <p class="hint" role="status" id="save-status">Historial guardado en este navegador.</p>
 </section>

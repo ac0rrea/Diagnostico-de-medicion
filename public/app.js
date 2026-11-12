@@ -5,13 +5,13 @@ const states = {
   'No detectado':'absent', 'No verificable':'unknown', 'No aplica':''
 };
 const controls = [
-  ['consent','Consentimiento y cobertura','Probar los estados del banner y registrar las rutas recorridas.'],
-  ['ga4','GA4 · Eventos y recepción','Comparar el ID y los eventos observados con Tiempo real o DebugView.'],
-  ['purchase','GA4 · Compra de prueba','Cotejar transaction_id, valor, moneda y artículos con un pedido autorizado.'],
-  ['gtm','GTM · Contenedor y etiquetas','Verificar ID, activación, destino y versión publicada.'],
-  ['clarity','Clarity · Señal y sesión','Cotejar proyecto, señal de red y grabación de la sesión de prueba.'],
-  ['pixel','Meta Pixel · Eventos y recepción','Revisar ID, eventos y parámetros en navegador y en el Administrador de eventos.'],
-  ['capi','Meta CAPI · Recepción y deduplicación','Verificar el canal servidor y event_id compartido cuando corresponda.']
+  ['consent','Banner de cookies y recorrido','Abrir el sitio en una ventana nueva. Si aparece un banner, probar aceptar y rechazar en sesiones separadas. Registrar qué páginas se recorrieron y derivar la validación técnica si hace falta.','Vi el banner y recorrí inicio, producto y carrito. Falta validar qué etiquetas cambian al rechazar.'],
+  ['ga4','GA4 · Navegación y eventos','Abrir un producto y agregarlo al carrito. Si se tiene acceso a GA4, buscar esas acciones en Tiempo real o DebugView de la cuenta.','Vi la visita al producto y el agregado al carrito en GA4.'],
+  ['purchase','GA4 · Compra de prueba','Confirmar en GA4 una compra de prueba autorizada. Si falta autorización o acceso, marcar No verificable y dejar el motivo.','Falta coordinar el pedido de prueba con Proyectos.'],
+  ['gtm','GTM · Contenedor y etiquetas','Revisar el ID que muestra el escaneo o Tag Assistant. Proyectos puede confirmar las etiquetas activadas y la versión publicada.','Aparece el contenedor. Falta confirmar qué etiquetas activa.'],
+  ['clarity','Clarity · Carga y grabaciones','Revisar el indicio del escaneo. Si se puede acceder a Clarity, navegar por la tienda y buscar la sesión en Grabaciones del proyecto de la marca.','Aparece en GTM. Falta confirmar una grabación en el proyecto.'],
+  ['pixel','Meta Pixel · Eventos del navegador','Abrir un producto y agregarlo al carrito. Revisar si aparecen ViewContent y AddToCart en la extensión de Meta o en Probar eventos.','Vi ViewContent y AddToCart. Falta cotejar el origen de datos.'],
+  ['capi','Meta CAPI · Eventos del servidor','Si la cuenta usa CAPI, pedir a Proyectos o Paid que confirme los eventos de servidor y si Meta cuenta una sola vez la misma acción.','Falta acceso al Administrador de eventos para confirmar CAPI.']
 ];
 const metadata = [
   ['owner','Responsable y área'],['date','Fecha y hora','datetime-local'],['zone','Zona horaria'],
@@ -29,6 +29,7 @@ let scanData = null;
 let isExample = false;
 let scanRequest = null;
 let currentReport = null;
+let savedFields = {};
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const options = (values, placeholder) => '<option value="">'+placeholder+'</option>'+values.map(v => '<option>'+escapeHtml(v)+'</option>').join('');
 function fields(items) {
@@ -39,14 +40,17 @@ function fields(items) {
     return '<label>'+label+node+'</label>';
   }).join('');
 }
-$('extra').innerHTML = fields(metadata.map(([n,...rest]) => ['meta-'+n,...rest]));
 $('follow').innerHTML = fields(follow.map(([n,...rest]) => ['follow-'+n,...rest]));
-$('checks').innerHTML = controls.map(([key,title,hint]) => '<article class="check"><div><h3>'+title+'</h3><p>'+hint+'</p></div>'
+$('checks').innerHTML = controls.map(([key,title,hint,example]) => '<article class="check" id="control-'+key+'"><div><h3>'+title+'</h3><p>'+hint+'</p></div>'
   +'<select aria-label="Estado de '+title+'" name="state-'+key+'">'+options(Object.keys(states),'Pendiente')+'</select>'
-  +'<details><summary>Detalles y evidencia</summary><div class="fields extra">'
-  +fields([['route-'+key,'Ruta, acción y condición'],['expected-'+key,'Evento o ID esperado'],['observed-'+key,'Observado / motivo pendiente'],
-    ['proof-'+key,'Evidencia, hora o enlace'],['action-'+key,'Próximo paso / responsable']])
-  +'</div></details></article>').join('');
+  +'<label class="check-note">Nota o enlace a evidencia (opcional)<textarea maxlength="800" name="note-'+key+'" placeholder="'+escapeHtml('Ej.: '+example)+'"></textarea></label>'
+  +(key === 'clarity' ? '<details id="clarity-guide" class="clarity-guide"><summary>Cómo comprobar Clarity si el escaneo no lo encuentra</summary>'
+    +'<ol class="list"><li><strong>Si se tiene acceso al proyecto:</strong> abrir la tienda, interactuar con una página y buscar esa sesión en Grabaciones de Clarity.</li>'
+    +'<li><strong>Para Proyectos, desde el navegador:</strong> abrir F12 → Red, filtrar por <code>clarity.ms</code>, recargar y navegar con el consentimiento que corresponda. Una solicitud <code>POST …/collect</code> indica envío desde el navegador. La grabación en el proyecto confirma recepción.</li>'
+    +'<li><strong>Para Proyectos, desde GTM:</strong> usar Vista previa o Tag Assistant, buscar la etiqueta de Clarity entre las activadas y revisar el ID del proyecto. Confirmar también en el sitio publicado, ya que la vista previa puede usar un borrador.</li></ol>'
+    +'<p>Si solo hay un indicio del escaneo, marcar Parcial y registrar qué falta. Si no se pudo hacer ninguna comprobación, marcar No verificable.</p>'
+    +'<p><a href="https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-setup" target="_blank" rel="noopener">Guía de Microsoft</a> · <a href="https://support.google.com/tagmanager/answer/6107056" target="_blank" rel="noopener">Guía de Google Tag Manager</a></p></details>' : '')
+  +'</article>').join('');
 function setField(name,value) {
   const field = form.elements.namedItem(name);
   if (field) field.value = value ?? '';
@@ -73,12 +77,23 @@ function renderScan() {
   node.hidden = !scanData;
   if (!scanData) { node.replaceChildren(); return; }
   node.innerHTML = '<div class="scan-grid">'+scanData.signals.map(signal => '<div class="signal"><h3>'+escapeHtml(signal.name)+'</h3><p>'
-    +(signal.pages.length ? 'Indicio en '+signal.pages.length+' página(s)' : 'Sin indicios en el HTML')+'</p>'
-    +(signal.ids.length ? '<p>'+signal.ids.map(escapeHtml).join(' · ')+'</p>' : '')+'</div>').join('')+'</div>'
+    +escapeHtml(signalSummary(signal,scanData))+'</p>'
+    +(signal.ids.length ? '<p>'+signal.ids.map(escapeHtml).join(' · ')+'</p>' : '')
+    +(signal.name === 'Clarity' ? '<p><a href="#clarity-guide" data-clarity-help>Cómo verificarlo</a></p>' : '')+'</div>').join('')+'</div>'
     +'<details><summary>Páginas y señales del escaneo</summary><ul class="list">'
     +scanData.pages.map(page => '<li>'+escapeHtml(page.url)+' · '+escapeHtml(page.result)+'</li>').join('')
     +scanData.signals.filter(s => s.pages.length).map(s => '<li>'+escapeHtml(s.name)+' · '+s.pages.map(escapeHtml).join(', ')+'</li>').join('')
     +'</ul><p class="hint">El escaneo no confirma ejecución, consentimiento, recepción ni eventos del servidor.</p></details>';
+  node.querySelector('[data-clarity-help]')?.addEventListener('click',() => { $('clarity-guide').open = true; });
+}
+function signalSummary(signal,data) {
+  if (signal.name !== 'Clarity') return signal.pages.length ? 'Indicio en '+signal.pages.length+' página(s)' : 'Sin indicios en el HTML';
+  const sources = [];
+  if (signal.pages.length) sources.push('HTML de '+signal.pages.length+' página(s)');
+  if (signal.containers?.length) sources.push('GTM publicado ('+signal.containers.join(', ')+')');
+  if (sources.length) return 'Indicio en '+sources.join(' y ')+' · falta confirmar actividad';
+  const inspected = data.clarityGtm?.filter(c => c.checked).length ?? 0;
+  return (inspected ? 'Sin indicios en HTML ni en los contenedores consultados' : 'Sin indicios en el HTML')+' · verificar al navegar';
 }
 function reset(record = null) {
   scanRequest?.abort();
@@ -88,6 +103,7 @@ function reset(record = null) {
   for (const box of form.querySelectorAll('details')) box.open = false;
   $('save-status').textContent = 'Historial guardado en este navegador.';
   currentId = record?.id ?? null;
+  savedFields = record?.fields ?? {};
   scanData = record?.scan ?? null;
   isExample = !!record?.example;
   for (const [name,value] of Object.entries(record?.fields ?? {})) setField(name,value);
@@ -102,20 +118,21 @@ $('demo').onclick = () => reset({
     url:'https://tienda.example',brand:'Tienda Demo',platform:'Tiendanube',
     'meta-owner':'Referente de Paid Media','meta-environment':'Producción (simulada)','meta-device':'Chrome · escritorio',
     'meta-consent':'Aceptación de analítica y marketing','meta-scope':'Inicio, categoría, producto y carrito',
-    'state-consent':'Correcto','observed-consent':'Se probó aceptación y rechazo.',
-    'state-ga4':'Correcto','expected-ga4':'G-DEMO123 · view_item y add_to_cart','observed-ga4':'Recepción de ambos eventos en DebugView.','proof-ga4':'DEMO-01 · captura de DebugView',
-    'state-purchase':'No verificable','observed-purchase':'Falta coordinar un pedido de prueba.',
-    'state-gtm':'Correcto','expected-gtm':'GTM-DEMO01','proof-gtm':'DEMO-02 · versión publicada',
-    'state-clarity':'Parcial','observed-clarity':'Sesión visible. Falta comprobar cobertura en producto.',
-    'state-pixel':'Correcto','observed-pixel':'PageView y AddToCart recibidos.',
-    'state-capi':'No verificable','observed-capi':'Falta acceso al origen de datos.',
+    'state-consent':'Correcto','note-consent':'Se probó aceptación y rechazo.',
+    'state-ga4':'Correcto','note-ga4':'Se vieron view_item y add_to_cart en DebugView. Captura DEMO-01.',
+    'state-purchase':'No verificable','note-purchase':'Falta coordinar un pedido de prueba.',
+    'state-gtm':'Correcto','note-gtm':'GTM-DEMO01. Se revisaron las etiquetas de la versión publicada.',
+    'state-clarity':'Parcial','note-clarity':'Hay indicios en GTM. Falta confirmar una grabación de prueba.',
+    'state-pixel':'Correcto','note-pixel':'PageView y AddToCart recibidos.',
+    'state-capi':'No verificable','note-capi':'Falta acceso al origen de datos.',
     'follow-priority':'Alta','follow-assignee':'Proyectos','follow-next':'Coordinar compra de prueba y acceso a Meta para comprobar CAPI.'
   },
   scan:{
     finalUrl:'https://tienda.example/',
     pages:['/','/categorias/calzado','/productos/zapatilla'].map(p => ({url:'https://tienda.example'+p,result:'HTML revisado (ejemplo)'})),
-    signals:[['GA4','G-DEMO123'],['GTM','GTM-DEMO01'],['Clarity','demo123'],['Meta Pixel','123456789000000']]
-      .map(([name,id]) => ({name,ids:[id],pages:['https://tienda.example/']}))
+    signals:[...([['GA4','G-DEMO123'],['GTM','GTM-DEMO01'],['Meta Pixel','123456789000000']]
+      .map(([name,id]) => ({name,ids:[id],pages:['https://tienda.example/']}))),
+      {name:'Clarity',ids:['demo123'],pages:[],containers:['GTM-DEMO01']}]
   }
 });
 $('url').addEventListener('input', () => {
@@ -159,7 +176,24 @@ $('scan').onclick = async () => {
   }
 };
 function snapshot() {
-  return {id:currentId, example:isExample, updatedAt:new Date().toISOString(), fields:Object.fromEntries(new FormData(form)), scan:scanData};
+  return {id:currentId, example:isExample, updatedAt:new Date().toISOString(),
+    fields:{...savedFields,...Object.fromEntries(new FormData(form))}, scan:scanData};
+}
+function validateBasics() {
+  for (const name of ['url','brand','meta-owner']) {
+    const input = form.elements.namedItem(name);
+    input.value = input.value.trim();
+  }
+  if (!form.reportValidity()) return false;
+  try {
+    cleanUrl($('url').value);
+    return true;
+  } catch {
+    $('url').setCustomValidity('Ingresar una URL de sitio válida.');
+    $('url').reportValidity();
+    $('url').setCustomValidity('');
+    return false;
+  }
 }
 function history() {
   try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
@@ -172,11 +206,12 @@ function readReport(record) {
     const state = f['state-'+id];
     const detail = [['route-','Escenario'],['expected-','Esperado'],['observed-','Observado'],['proof-','Evidencia'],['action-','Próximo paso']]
       .filter(([prefix]) => f[prefix+id]).map(([prefix,label]) => '<div>'+label+' · '+escapeHtml(f[prefix+id])+'</div>').join('');
-    return '<li><strong>'+title+'</strong> · <span class="'+(states[state] || '')+'">'+escapeHtml(state || 'Pendiente')+'</span>'+detail+'</li>';
+    return '<li><strong>'+title+'</strong> · <span class="'+(states[state] || '')+'">'+escapeHtml(state || 'Pendiente')+'</span>'
+      +(f['note-'+id] ? '<div>'+escapeHtml(f['note-'+id])+'</div>' : '')+detail+'</li>';
   }).join('');
   const scan = record.scan ? '<h3>Escaneo preliminar</h3><p>URL final · '+escapeHtml(record.scan.finalUrl)+'</p><ul>'
     +record.scan.pages.map(p => '<li>'+escapeHtml(p.url)+' · '+escapeHtml(p.result)+'</li>').join('')
-    +record.scan.signals.map(s => '<li>'+escapeHtml(s.name)+' · '+(s.pages.length ? 'Indicio en '+s.pages.length+' página(s)' : 'Sin indicios en el HTML')+
+    +record.scan.signals.map(s => '<li>'+escapeHtml(s.name)+' · '+escapeHtml(signalSummary(s,record.scan))+
       (s.ids.length ? ' · '+s.ids.map(escapeHtml).join(', ') : '')+'</li>').join('')+'</ul><p>Revisión del HTML público. La ejecución y recepción se validan por separado.</p>' : '';
   return '<p><strong>'+escapeHtml(f.brand || 'Cuenta sin nombre')+'</strong> · '+escapeHtml(f.platform || 'Plataforma por confirmar')+'</p>'
     +'<p>'+escapeHtml(f.url || 'URL pendiente')+(record.example ? ' · Ejemplo ficticio' : '')+'</p>'
@@ -185,6 +220,7 @@ function readReport(record) {
     +'<h3>Derivación y seguimiento</h3><ul>'+(rows(follow,'follow-') || '<li>Pendiente de registrar</li>')+'</ul>';
 }
 $('report').onclick = () => {
+  if (!validateBasics()) return;
   currentReport = snapshot();
   $('report-content').innerHTML = readReport(currentReport);
   $('dialog').showModal();
@@ -201,11 +237,8 @@ $('download').onclick = () => {
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 };
 $('save').onclick = () => {
+  if (!validateBasics()) return;
   const record = snapshot();
-  if (!record.fields.url.trim() && !record.fields.brand.trim()) {
-    $('save-status').textContent = 'Completar la marca o la URL para guardar la auditoría.';
-    return;
-  }
   record.id ??= globalThis.crypto?.randomUUID?.() ?? String(Date.now());
   try {
     localStorage.setItem(key,JSON.stringify([record,...history().filter(x => x.id !== record.id)]));
