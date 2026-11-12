@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WE ARE | Diagnóstico de medición</title>
+<link rel="stylesheet" href="style.css"><script defer src="app.js"></script>
+</head>
+<body>
+<header class="top"><span>WE ARE</span><span>PROYECTOS + PAID MEDIA</span></header>
+<div class="shell">
+<aside class="side"><div class="brand"><span class="mark">W</span><div>WE ARE<small>Panel de agencia</small></div></div>
+<nav aria-label="Secciones">
+<button type="button" data-view="audit" aria-current="page"><span>◈</span> Diagnóstico</button>
+<button type="button" data-view="history"><span>◷</span> Historial</button>
+</nav><div class="side-foot">Medición digital<small>Prototipo · Nivel 3</small></div></aside>
+<main>
+<section id="audit">
+<div class="hero"><div><p class="eyebrow">MEDICIÓN DIGITAL</p><h1>Diagnóstico de medición</h1><p>Revisar señales del sitio, completar los controles y preparar un informe para Paid Media y Proyectos.</p></div><button id="demo" class="secondary" type="button">Cargar ejemplo <span aria-hidden="true">↗</span></button></div>
+<div class="steps" aria-label="Etapas"><a href="#sitio"><b>01</b> Sitio y escaneo</a><a href="#checklist"><b>02</b> Checklist</a><a href="#informe"><b>03</b> Informe</a></div>
+<form id="audit-form">
+<section class="panel" id="sitio"><div class="section-head"><div><p class="eyebrow">PASO 01</p><h2>Sitio y escaneo</h2></div></div>
+<div class="fields primary-fields">
+<label>URL del sitio<input name="url" id="url" placeholder="https://www.marca.com" inputmode="url" maxlength="280"></label>
+<label>Marca o cuenta<input name="brand" placeholder="Nombre de la cuenta" maxlength="100"></label>
+<label>Plataforma<select name="platform"><option value="">Seleccionar</option><option>Tiendanube</option><option>Shopify</option><option>VTEX</option><option>Magento / Adobe Commerce</option><option>Headless</option><option>Otra / por confirmar</option></select></label>
+</div>
+<div class="actions"><button id="scan" type="button" class="accent">Escanear URL <span aria-hidden="true">→</span></button><p class="hint" id="scan-status" role="status">Busca indicios en el HTML público de hasta 3 páginas.</p></div>
+<details><summary>Datos de la auditoría</summary><div class="fields extra" id="extra"></div></details>
+<div id="scan-result" hidden></div>
+</section>
+<section class="panel" id="checklist">
+<div class="section-head"><div><p class="eyebrow">PASO 02</p><h2>Checklist de verificación</h2><p>Registrar el resultado por control. Los indicios del escaneo son evidencia preliminar.</p></div><span id="progress" class="progress"></span></div>
+<div id="checks"></div>
+</section>
+<section class="panel" id="informe">
+<div class="section-head"><div><p class="eyebrow">PASO 03</p><h2>Informe y derivación</h2><p>El informe reúne los resultados, pendientes y próximos pasos.</p></div></div>
+<div class="fields extra" id="follow"></div>
+<div class="actions"><button type="button" id="report" class="accent">Ver informe</button><button type="button" id="save" class="secondary">Guardar en historial</button><button type="button" id="new" class="quiet">Nueva auditoría</button></div>
+<p class="hint" role="status" id="save-status">Historial guardado en este navegador.</p>
+</section>
+</form>
+</section>
+<section id="history" hidden><div class="hero"><div><p class="eyebrow">MEDICIÓN DIGITAL</p><h1>Historial</h1><p>Auditorías guardadas en este navegador.</p></div><button type="button" class="secondary" id="back">Volver al diagnóstico</button></div><div id="history-list" class="panel"></div></section>
+</main></div>
+<dialog id="dialog"><div class="dialog-head"><h2>Informe de diagnóstico</h2><button type="button" id="close" class="secondary" aria-label="Cerrar informe">Cerrar</button></div><div id="report-content"></div><div class="actions"><button class="accent" id="download" type="button">Descargar informe</button></div></dialog>
+</body></html>
